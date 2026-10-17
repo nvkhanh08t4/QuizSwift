@@ -1,17 +1,18 @@
+
 # Ứng dụng Quiz Thông Minh (Excel + AI)
 
 Ứng dụng Quiz tương tác cho phép tải câu hỏi từ file Excel và cung cấp phản hồi giải thích đáp án bằng trí tuệ nhân tạo (Genkit AI).
 
 ## Tính năng chính
-- **Dữ liệu linh hoạt:** Tự động đọc câu hỏi từ tệp `src/CCNH.xlsx`.
+- **Dữ liệu linh hoạt:** Tự động đọc câu hỏi từ tệp `CCNH.xlsx`.
 - **Hỗ trợ AI:** Giải thích tại sao đáp án đúng/sai và cung cấp kiến thức bổ sung khi xem kết quả.
-- **Tùy chỉnh:** Chọn số lượng câu hỏi và giới hạn thời gian làm bài.
 - **Giao diện hiện đại:** Xây dựng với Next.js, Tailwind CSS và ShadCN UI.
 
 ## Hướng dẫn Deploy lên Vercel (Từng bước)
 
 1. **Chuẩn bị mã nguồn:** 
-   - Đẩy toàn bộ code lên một Repository trên GitHub (bao gồm cả file Excel trong thư mục `src`).
+   - Đẩy toàn bộ code lên một Repository trên GitHub.
+   - **Lưu ý quan trọng cho Vercel:** Hãy di chuyển file `CCNH.xlsx` ra **thư mục gốc** của dự án (cùng cấp với tệp `package.json`) thay vì để trong `src/`. Điều này đảm bảo máy chủ Vercel luôn tìm thấy file dữ liệu.
    
 2. **Import vào Vercel:**
    - Đăng nhập [Vercel](https://vercel.com/).
@@ -33,4 +34,4 @@
 4. Truy cập: `http://localhost:9002`
 
 ## Lưu ý về dữ liệu câu hỏi
-- File Excel `src/CCNH.xlsx` cần có các cột tiêu đề (không dấu hoặc có dấu): `Câu hỏi`, `OptionA`, `OptionB`, `OptionC`, `OptionD`, `Đáp án đúng` (giá trị A, B, C, hoặc D).
+- File Excel `CCNH.xlsx` cần có các cột tiêu đề (không dấu hoặc có dấu): `Câu hỏi`, `OptionA`, `OptionB`, `OptionC`, `OptionD`, `Đáp án đúng` (giá trị A, B, C, hoặc D).

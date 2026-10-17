@@ -1,3 +1,4 @@
+
 'use server';
 
 import { verifyAnswer, type VerifyAnswerInput, type VerifyAnswerOutput } from '@/ai/flows/ai-answer-verification';
@@ -21,10 +22,19 @@ export async function getAIFeedback(input: VerifyAnswerInput): Promise<VerifyAns
 
 export async function getQuestions(): Promise<{ questions: Question[]; skippedRows: (string | number)[] }> {
   try {
-    const filePath = path.join(process.cwd(), 'src', 'CCNH.xlsx');
+    // Ưu tiên tìm file ở thư mục gốc (tốt nhất cho Vercel) sau đó mới tìm trong src/
+    let filePath = path.join(process.cwd(), 'CCNH.xlsx');
+    
+    if (!fs.existsSync(filePath)) {
+      filePath = path.join(process.cwd(), 'src', 'CCNH.xlsx');
+    }
+
     if (!fs.existsSync(filePath)) {
       console.error("Excel file not found at:", filePath);
-      return { questions: [], skippedRows: ["File CCNH.xlsx không tồn tại trong thư mục src/"] };
+      return { 
+        questions: [], 
+        skippedRows: ["Không tìm thấy file CCNH.xlsx. Hãy đảm bảo file nằm ở thư mục gốc của dự án hoặc trong thư mục src/"] 
+      };
     }
 
     const buf = fs.readFileSync(filePath);
@@ -32,13 +42,11 @@ export async function getQuestions(): Promise<{ questions: Question[]; skippedRo
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     
-    // Đọc toàn bộ dữ liệu dưới dạng mảng các mảng để tìm dòng tiêu đề
     const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
     if (rows.length === 0) {
       return { questions: [], skippedRows: ["File Excel trống"] };
     }
 
-    // Tìm dòng tiêu đề (dòng chứa từ khóa 'câu hỏi' hoặc 'question')
     let headerRowIndex = 0;
     for (let i = 0; i < Math.min(rows.length, 10); i++) {
       const row = rows[i].map(c => String(c || '').toLowerCase());
@@ -48,7 +56,6 @@ export async function getQuestions(): Promise<{ questions: Question[]; skippedRo
       }
     }
 
-    // Chuyển đổi lại sang JSON bắt đầu từ dòng tiêu đề đã tìm thấy
     const json: any[] = XLSX.utils.sheet_to_json(worksheet, { range: headerRowIndex });
 
     const parsedQuestions: Question[] = [];
@@ -64,11 +71,8 @@ export async function getQuestions(): Promise<{ questions: Question[]; skippedRo
       }
       
       const rowId = normalizedRow.id || normalizedRow.stt || `Dòng ${index + headerRowIndex + 2}`;
-
-      // Tìm kiếm các cột linh hoạt
       const questionText = String(normalizedRow['question'] || normalizedRow['cauhoi'] || normalizedRow['noidung'] || '').trim();
       
-      // Hỗ trợ cả OptionA và chỉ A
       const optA = String(normalizedRow['optiona'] || normalizedRow['dapana'] || normalizedRow['a'] || '').trim();
       const optB = String(normalizedRow['optionb'] || normalizedRow['dapanb'] || normalizedRow['b'] || '').trim();
       const optC = String(normalizedRow['optionc'] || normalizedRow['dapanc'] || normalizedRow['c'] || '').trim();
@@ -76,9 +80,7 @@ export async function getQuestions(): Promise<{ questions: Question[]; skippedRo
       
       const correctAnswerRaw = String(normalizedRow['correctanswer'] || normalizedRow['dapandung'] || normalizedRow['ketqua'] || normalizedRow['dapan'] || '').trim();
       
-      if (!questionText) {
-        return; // Bỏ qua các dòng hoàn toàn trống
-      }
+      if (!questionText) return;
       
       if (!correctAnswerRaw) {
         skippedRows.push(`${rowId} (Thiếu đáp án đúng)`);

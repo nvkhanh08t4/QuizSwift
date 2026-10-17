@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -95,7 +96,7 @@ export function QuizSetupForm({ maxQuestions, defaultQuestions, skippedRows }: Q
               <FileWarning className="h-4 w-4" />
               <AlertTitle>Không tìm thấy dữ liệu</AlertTitle>
               <AlertDescription>
-                Hệ thống không tìm thấy câu hỏi hợp lệ trong tệp <strong>src/CCNH.xlsx</strong>.
+                Hệ thống không tìm thấy câu hỏi hợp lệ trong tệp <strong>CCNH.xlsx</strong>.
                 {skippedRows.length > 0 && (
                   <div className="mt-2 text-xs font-mono">
                     Lỗi: {skippedRows.join(', ')}
