@@ -95,13 +95,17 @@ export function QuizSetupForm({ maxQuestions, defaultQuestions, skippedRows }: Q
             <Alert variant="destructive">
               <FileWarning className="h-4 w-4" />
               <AlertTitle>Không tìm thấy dữ liệu</AlertTitle>
-              <AlertDescription>
-                Hệ thống không tìm thấy câu hỏi hợp lệ trong tệp <strong>CCNH.xlsx</strong>.
+              <AlertDescription className="space-y-2">
+                <p>Hệ thống không tìm thấy tệp <strong>CCNH.xlsx</strong> hoặc nội dung không hợp lệ.</p>
                 {skippedRows.length > 0 && (
-                  <div className="mt-2 text-xs font-mono">
-                    Lỗi: {skippedRows.join(', ')}
+                  <div className="mt-2 text-xs bg-black/5 p-2 rounded">
+                    <strong>Chi tiết lỗi:</strong>
+                    <ScrollArea className="h-20 mt-1">
+                      {skippedRows.map((err, i) => <div key={i}>- {err}</div>)}
+                    </ScrollArea>
                   </div>
                 )}
+                <p className="text-xs italic mt-2">Lưu ý: Hãy đảm bảo file Excel nằm ở <strong>thư mục gốc</strong> của dự án khi đẩy lên GitHub.</p>
               </AlertDescription>
             </Alert>
             <Button variant="outline" className="w-full" onClick={() => window.location.reload()}>
@@ -148,7 +152,7 @@ export function QuizSetupForm({ maxQuestions, defaultQuestions, skippedRows }: Q
                   <AlertTitle className="text-amber-800 text-sm">Lưu ý: Bỏ qua {skippedRows.length} hàng lỗi</AlertTitle>
                   <ScrollArea className="h-20 mt-1">
                     <AlertDescription className="text-amber-700 text-[10px] leading-tight">
-                      IDs bị lỗi: {skippedRows.join(', ')}
+                      Lỗi tại: {skippedRows.join(', ')}
                     </AlertDescription>
                   </ScrollArea>
                 </Alert>
