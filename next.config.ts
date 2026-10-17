@@ -8,6 +8,9 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  outputFileTracingIncludes: {
+    "/*": ["./CCNH.xlsx"],
+  },
   images: {
     remotePatterns: [
       {
