@@ -10,6 +10,7 @@ import type { Question } from '@/lib/types';
 export default function HomePage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [skippedRows, setSkippedRows] = useState<(string | number)[]>([]);
+  const [debugInfo, setDebugInfo] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
 
@@ -18,6 +19,7 @@ export default function HomePage() {
     getQuestions().then(result => {
       setQuestions(result.questions);
       setSkippedRows(result.skippedRows);
+      setDebugInfo(result.debugInfo);
       setIsLoading(false);
     });
   }, []);
@@ -39,6 +41,7 @@ export default function HomePage() {
           defaultQuestions={questions} 
           maxQuestions={questions.length}
           skippedRows={skippedRows}
+          debugInfo={debugInfo}
         />
       </main>
     </div>

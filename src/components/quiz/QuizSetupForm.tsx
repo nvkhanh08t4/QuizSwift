@@ -1,4 +1,3 @@
-
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -28,18 +27,19 @@ type QuizSetupFormProps = {
   maxQuestions: number;
   defaultQuestions: Question[];
   skippedRows: (string | number)[];
+  debugInfo?: string;
 };
 
-export function QuizSetupForm({ maxQuestions, defaultQuestions, skippedRows }: QuizSetupFormProps) {
+export function QuizSetupForm({ maxQuestions, defaultQuestions, skippedRows, debugInfo }: QuizSetupFormProps) {
   const router = useRouter();
 
   const FormSchema = useMemo(() => {
     return z.object({
       numQuestions: z.coerce
         .number()
-        .min(maxQuestions > 0 ? 1 : 0, 'Số lượng câu hỏi không hợp lệ.')
-        .max(maxQuestions > 0 ? maxQuestions : 1, `Số lượng không được vượt quá ${maxQuestions}.`),
-      timeLimit: z.coerce.number().min(1, 'Thời gian làm bài tối thiểu 1 phút.').max(120),
+        .min(maxQuestions > 0 ? 1 : 0, 'Số lượng không hợp lệ.')
+        .max(maxQuestions > 0 ? maxQuestions : 1, `Tối đa ${maxQuestions} câu.`),
+      timeLimit: z.coerce.number().min(1, 'Tối thiểu 1 phút.').max(120),
     });
   }, [maxQuestions]);
 
@@ -55,7 +55,7 @@ export function QuizSetupForm({ maxQuestions, defaultQuestions, skippedRows }: Q
     if (maxQuestions === 0) {
       toast({
         title: 'Lỗi',
-        description: 'Không có câu hỏi nào để bắt đầu.',
+        description: 'Không có câu hỏi để bắt đầu.',
         variant: 'destructive',
       });
       return;
@@ -87,25 +87,22 @@ export function QuizSetupForm({ maxQuestions, defaultQuestions, skippedRows }: Q
     <Card className="w-full max-w-lg shadow-xl">
       <CardHeader>
         <CardTitle className="font-headline text-3xl">Thiết lập Quiz</CardTitle>
-        <CardDescription>Chọn số lượng câu hỏi và thời gian để bắt đầu.</CardDescription>
+        <CardDescription>Chọn số lượng câu hỏi và thời gian.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {maxQuestions === 0 ? (
           <div className="space-y-4">
             <Alert variant="destructive">
               <FileWarning className="h-4 w-4" />
-              <AlertTitle>Không tìm thấy dữ liệu</AlertTitle>
+              <AlertTitle>Không có dữ liệu</AlertTitle>
               <AlertDescription className="space-y-2">
-                <p>Hệ thống không tìm thấy tệp <strong>CCNH.xlsx</strong> hoặc nội dung không hợp lệ.</p>
-                {skippedRows.length > 0 && (
-                  <div className="mt-2 text-xs bg-black/5 p-2 rounded">
-                    <strong>Chi tiết lỗi:</strong>
-                    <ScrollArea className="h-20 mt-1">
-                      {skippedRows.map((err, i) => <div key={i}>- {err}</div>)}
-                    </ScrollArea>
+                <p>Không tìm thấy file <strong>CCNH.xlsx</strong> hoặc file bị lỗi định dạng.</p>
+                {debugInfo && (
+                  <div className="mt-2 text-[10px] bg-black/10 p-2 rounded font-mono break-all overflow-hidden">
+                    <strong>Debug:</strong> {debugInfo}
                   </div>
                 )}
-                <p className="text-xs italic mt-2">Lưu ý: Hãy đảm bảo file Excel nằm ở <strong>thư mục gốc</strong> của dự án khi đẩy lên GitHub.</p>
+                <p className="text-xs italic mt-2">Đảm bảo file Excel nằm ở thư mục gốc của GitHub.</p>
               </AlertDescription>
             </Alert>
             <Button variant="outline" className="w-full" onClick={() => window.location.reload()}>
@@ -136,11 +133,11 @@ export function QuizSetupForm({ maxQuestions, defaultQuestions, skippedRows }: Q
                 name="timeLimit"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Thời gian giới hạn (phút)</FormLabel>
+                    <FormLabel>Thời gian làm bài (phút)</FormLabel>
                     <FormControl>
                       <Input type="number" placeholder="Ví dụ: 10" {...field} />
                     </FormControl>
-                    <FormDescription>Thời gian hoàn thành toàn bộ bài thi.</FormDescription>
+                    <FormDescription>Giới hạn thời gian hoàn thành.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -149,9 +146,9 @@ export function QuizSetupForm({ maxQuestions, defaultQuestions, skippedRows }: Q
               {skippedRows.length > 0 && (
                 <Alert className="bg-amber-50 border-amber-200">
                   <AlertCircle className="h-4 w-4 text-amber-600" />
-                  <AlertTitle className="text-amber-800 text-sm">Lưu ý: Bỏ qua {skippedRows.length} hàng lỗi</AlertTitle>
+                  <AlertTitle className="text-amber-800 text-sm">Bỏ qua {skippedRows.length} hàng lỗi</AlertTitle>
                   <ScrollArea className="h-20 mt-1">
-                    <AlertDescription className="text-amber-700 text-[10px] leading-tight">
+                    <AlertDescription className="text-amber-700 text-[10px]">
                       Lỗi tại: {skippedRows.join(', ')}
                     </AlertDescription>
                   </ScrollArea>

@@ -21,10 +21,10 @@ export async function getAIFeedback(input: VerifyAnswerInput): Promise<VerifyAns
 }
 
 export async function getQuestions(): Promise<{ questions: Question[]; skippedRows: (string | number)[]; debugInfo?: string }> {
+  const rootDir = process.cwd();
+  let debugInfo = `CWD: ${rootDir}. `;
+  
   try {
-    const rootDir = process.cwd();
-    
-    // Danh sách các đường dẫn tiềm năng để tìm file
     const searchPaths = [
       path.join(rootDir, 'CCNH.xlsx'),
       path.join(rootDir, 'ccnh.xlsx'),
@@ -34,7 +34,6 @@ export async function getQuestions(): Promise<{ questions: Question[]; skippedRo
     ];
 
     let filePath = '';
-    // Kiểm tra trực tiếp các đường dẫn phổ biến
     for (const p of searchPaths) {
       if (fs.existsSync(p)) {
         filePath = p;
@@ -42,25 +41,17 @@ export async function getQuestions(): Promise<{ questions: Question[]; skippedRo
       }
     }
 
-    // Nếu vẫn không tìm thấy, quét toàn bộ thư mục gốc để tìm tệp .xlsx bất kỳ
     if (!filePath) {
-      try {
-        const files = fs.readdirSync(rootDir);
-        const excelFile = files.find(f => f.toLowerCase().endsWith('.xlsx'));
-        if (excelFile) {
-          filePath = path.join(rootDir, excelFile);
-        }
-      } catch (e) {
-        console.error("Error scanning root directory:", e);
-      }
+      const files = fs.readdirSync(rootDir);
+      const excelFile = files.find(f => f.toLowerCase().endsWith('.xlsx'));
+      if (excelFile) filePath = path.join(rootDir, excelFile);
     }
 
     if (!filePath) {
-      const debugInfo = `CWD: ${rootDir}. Checked paths: ${searchPaths.length}. Files in root: ${fs.readdirSync(rootDir).join(', ')}`;
       return { 
         questions: [], 
-        skippedRows: ["Không tìm thấy file CCNH.xlsx. Hãy đảm bảo file đã được commit và push lên GitHub."],
-        debugInfo
+        skippedRows: ["Không tìm thấy file Excel."],
+        debugInfo: debugInfo + "No .xlsx found."
       };
     }
 
@@ -69,89 +60,102 @@ export async function getQuestions(): Promise<{ questions: Question[]; skippedRo
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     
-    // Đọc tất cả các hàng dưới dạng mảng để tìm dòng tiêu đề
-    const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+    const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as any[][];
     if (rows.length === 0) {
-      return { questions: [], skippedRows: ["File Excel không có dữ liệu."] };
+      return { questions: [], skippedRows: ["File trống."], debugInfo };
     }
 
-    // Tìm dòng chứa các từ khóa tiêu đề (Câu hỏi, Question, STT, v.v.)
     let headerRowIndex = -1;
     for (let i = 0; i < Math.min(rows.length, 20); i++) {
-      const row = rows[i].map(c => String(c || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
-      if (row.some(c => c.includes('cau hoi') || c.includes('question') || c.includes('noi dung') || c.includes('stt'))) {
+      const row = rows[i];
+      if (!row || row.length < 3) continue;
+
+      const normalizedRow = row.map(c => 
+        String(c || '').trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '')
+      );
+
+      const hasQuestion = normalizedRow.some(c => c.includes('cauhoi') || c.includes('question') || c.includes('noidung'));
+      const hasOptions = normalizedRow.some(c => c === 'a' || c === 'b' || c === 'c' || c === 'd' || c.includes('option') || c.includes('dapan'));
+      const hasCorrect = normalizedRow.some(c => c.includes('dapandung') || c.includes('correct') || c === 'key' || (c.includes('dapan') && !c.includes('a') && !c.includes('b')));
+
+      if (hasQuestion && (hasOptions || hasCorrect)) {
         headerRowIndex = i;
         break;
       }
     }
 
-    // Nếu không tìm thấy dòng tiêu đề rõ ràng, mặc định dùng dòng đầu tiên (index 0)
-    const finalHeaderIndex = headerRowIndex === -1 ? 0 : headerRowIndex;
-    const json: any[] = XLSX.utils.sheet_to_json(worksheet, { range: finalHeaderIndex });
+    if (headerRowIndex === -1) {
+      headerRowIndex = 0;
+    }
+
+    const headers = rows[headerRowIndex].map(h => 
+      String(h || '').trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '')
+    );
+
+    debugInfo += `Found: ${path.basename(filePath)}. Header at row ${headerRowIndex + 1}. `;
+
+    const colIndices = {
+      stt: headers.findIndex(h => h === 'stt' || h === 'id' || h === 'no' || h.includes('sott')),
+      question: headers.findIndex(h => h.includes('cauhoi') || h.includes('question') || h.includes('noidung')),
+      a: headers.findIndex(h => h === 'a' || h === 'optiona' || h.includes('dapana') || h.includes('phuongana')),
+      b: headers.findIndex(h => h === 'b' || h === 'optionb' || h.includes('dapanb') || h.includes('phuonganb')),
+      c: headers.findIndex(h => h === 'c' || h === 'optionc' || h.includes('dapanc') || h.includes('phuonganc')),
+      d: headers.findIndex(h => h === 'd' || h === 'optiond' || h.includes('dapand') || h.includes('phuongand')),
+      correct: headers.findIndex(h => h.includes('dapandung') || h.includes('correct') || h === 'dapan' || h === 'key' || h.includes('dapanthuc'))
+    };
 
     const parsedQuestions: Question[] = [];
     const skippedRows: (string | number)[] = [];
 
-    json.forEach((row, index) => {
-      // Chuẩn hóa key (tên cột) để dễ truy xuất
-      const normalizedRow: {[key: string]: any} = {};
-      for (const key in row) {
-        const cleanKey = key.trim().toLowerCase()
-          .normalize("NFD").replace(/[\u0300-\u036f]/g, "") 
-          .replace(/\s+/g, '');
-        normalizedRow[cleanKey] = row[key];
+    for (let i = headerRowIndex + 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.length === 0) continue;
+
+      const qText = String(row[colIndices.question] || '').trim();
+      if (!qText || qText.length < 5) continue;
+
+      const rowId = row[colIndices.stt] || `Hàng ${i + 1}`;
+      const optA = String(row[colIndices.a] || '').trim();
+      const optB = String(row[colIndices.b] || '').trim();
+      const optC = String(row[colIndices.c] || '').trim();
+      const optD = String(row[colIndices.d] || '').trim();
+      const correctRaw = String(row[colIndices.correct] || '').trim().toUpperCase();
+
+      if (!correctRaw) {
+        skippedRows.push(`${rowId} (Thiếu đáp án)`);
+        continue;
       }
-      
-      const rowId = normalizedRow.stt || normalizedRow.id || `Hàng ${index + finalHeaderIndex + 2}`;
-      
-      // Lấy nội dung câu hỏi
-      const questionText = String(normalizedRow['cauhoi'] || normalizedRow['question'] || normalizedRow['noidung'] || normalizedRow['noidungcauhoi'] || '').trim();
-      
-      // Lấy các phương án trả lời
-      const optA = String(normalizedRow['optiona'] || normalizedRow['dapana'] || normalizedRow['a'] || '').trim();
-      const optB = String(normalizedRow['optionb'] || normalizedRow['dapanb'] || normalizedRow['b'] || '').trim();
-      const optC = String(normalizedRow['optionc'] || normalizedRow['dapanc'] || normalizedRow['c'] || '').trim();
-      const optD = String(normalizedRow['optiond'] || normalizedRow['dapand'] || normalizedRow['d'] || '').trim();
-      
-      // Lấy đáp án đúng (A, B, C, hoặc D)
-      const correctAnswerRaw = String(normalizedRow['correctanswer'] || normalizedRow['dapandung'] || normalizedRow['ketqua'] || normalizedRow['dapan'] || '').trim().toUpperCase();
-      
-      if (!questionText) return; // Bỏ qua dòng trống hoàn toàn
-      
-      if (!correctAnswerRaw) {
-        skippedRows.push(`${rowId} (Thiếu đáp án đúng)`);
-        return;
+
+      let correctKey: 'A' | 'B' | 'C' | 'D' | 'ABCD' | null = null;
+      if (['A', 'B', 'C', 'D'].includes(correctRaw)) {
+        correctKey = correctRaw as any;
+      } else if (correctRaw === 'ABCD' || correctRaw.includes('TATCA') || correctRaw.includes('ALL')) {
+        correctKey = 'ABCD';
+      } else {
+        const firstChar = correctRaw.charAt(0);
+        if (['A', 'B', 'C', 'D'].includes(firstChar)) {
+          correctKey = firstChar as any;
+        }
       }
-      
-      let correctAnswerKey: 'A' | 'B' | 'C' | 'D' | 'ABCD' | null = null;
-      
-      if (['A', 'B', 'C', 'D'].includes(correctAnswerRaw)) {
-        correctAnswerKey = correctAnswerRaw as 'A' | 'B' | 'C' | 'D';
-      } else if (
-        correctAnswerRaw === 'ABCD' || 
-        correctAnswerRaw.includes('TATCA') || 
-        correctAnswerRaw.includes('ALL')
-      ) {
-        correctAnswerKey = 'ABCD';
-      }
-      
-      if (!correctAnswerKey) {
-          skippedRows.push(`${rowId} (Giá trị đáp án '${correctAnswerRaw}' không hợp lệ)`);
-          return;
+
+      if (!correctKey) {
+        skippedRows.push(`${rowId} (Đáp án '${correctRaw}' lạ)`);
+        continue;
       }
 
       parsedQuestions.push({
         id: rowId,
-        question: questionText,
+        question: qText,
         options: { A: optA, B: optB, C: optC, D: optD },
-        correctAnswer: correctAnswerKey,
+        correctAnswer: correctKey,
       });
-    });
+    }
 
-    return { questions: parsedQuestions, skippedRows };
+    debugInfo += `Parsed ${parsedQuestions.length} questions.`;
+    return { questions: parsedQuestions, skippedRows, debugInfo };
 
   } catch (error: any) {
-    console.error("Critical error in getQuestions:", error);
-    return { questions: [], skippedRows: [`Lỗi hệ thống: ${error.message}`] };
+    console.error("Error in getQuestions:", error);
+    return { questions: [], skippedRows: [`Lỗi: ${error.message}`], debugInfo: debugInfo + `Error: ${error.message}` };
   }
 }
